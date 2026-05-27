@@ -1,0 +1,13 @@
+**/*_local/
+data/*.csv
+data/*.parquet
+__pycache__/
+*.pyc
+.env
+.venv/
+.ipynb_checkpoints/
+# Allow rendered HTML but not Quarto intermediate files
+report/_files/
+report/.quarto/
+!report/causal_field_analytics.html
+.DS_Store
