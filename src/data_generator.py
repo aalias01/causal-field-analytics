@@ -47,7 +47,7 @@ BASELINE_MONTHLY_HAZARD = 0.015  # ~15% of units fail over 24 months naively
 
 # Regional hazard multipliers (confounders)
 REGION_HAZARD = {
-    "Southeast":  1.25,   # hot climate → more stress → more failures
+    "Southeast":  1.75,   # hot climate → more stress → more failures
     "Southwest":  1.10,
     "Midwest":    0.95,
     "Northwest":  0.85,
@@ -67,14 +67,22 @@ SEASONAL = {1:0.7, 2:0.75, 3:0.85, 4:0.90, 5:1.05, 6:1.20,
 OUT_PATH = Path("data/field_panel.csv")
 
 
-def _assign_treatment(install_date: date) -> str:
+def _assign_treatment(install_date: date, region: str) -> str:
     """
-    Non-random treatment assignment: newer units more likely to get variant B.
-    Creates realistic selection bias — naive comparison is confounded.
+    Non-random treatment assignment: newer units and Southeast installs are
+    more likely to get variant B. This mirrors a regional rollout where the
+    new design enters the hottest, highest-hazard market first.
     """
     cutoff = date(2023, 1, 1)
     months_after_cutoff = max(0, (install_date - cutoff).days / 30)
-    p_treatment = 0.15 + min(0.70, months_after_cutoff * 0.06)
+    region_bonus = {
+        "Southeast": 0.68,
+        "Southwest": 0.12,
+        "Midwest": -0.03,
+        "Northwest": -0.06,
+    }[region]
+    p_treatment = 0.08 + min(0.55, months_after_cutoff * 0.05) + region_bonus
+    p_treatment = min(max(p_treatment, 0.03), 0.90)
     return "B" if rng.random() < p_treatment else "A"
 
 
@@ -123,7 +131,7 @@ def generate_panel(n: int = N_UNITS) -> pd.DataFrame:
         install_date = START_DATE + timedelta(days=int(rng.integers(0, date_range)))
         region       = rng.choice(regions, p=region_probs)
         crew         = rng.choice(crews)
-        variant      = _assign_treatment(install_date)
+        variant      = _assign_treatment(install_date, region)
         op_hours     = round(rng.uniform(120, 260), 1)  # operating hours / month
 
         duration, event = _simulate_tte(region, crew, install_date, variant, ANALYSIS_END)

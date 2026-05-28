@@ -9,7 +9,7 @@
 
 Engineering organizations constantly make design changes — a supplier swap, a firmware update, a refrigerant-driven redesign — and then ask *"did this actually improve field reliability?"* The naive answer (compare failure rates before vs. after) is wrong. This project shows why, and builds the right toolkit.
 
-**Live report:** [your-report.vercel.app](https://your-report.vercel.app) *(fill in after deploy)*  
+**Live report:** local Quarto HTML ready to deploy *(see `report/causal_field_analytics.html` after render)*  
 **GitHub:** [aalias01/causal-field-analytics](https://github.com/aalias01/causal-field-analytics)
 
 ---
@@ -17,7 +17,7 @@ Engineering organizations constantly make design changes — a supplier swap, a 
 ## The Central Argument
 
 ```
-Naive before/after comparison: "The design change made failure rates WORSE (+X%)"
+Naive before/after comparison: "The design change made failure rates WORSE (+7.11%)"
 ↓
 What the naive view is missing:
   • Seasonality: HVAC fails more in July regardless of design
@@ -25,9 +25,9 @@ What the naive view is missing:
   • Regional confounding: Southeast rollout first — climate differs
   • Reporting lag: recently-installed units haven't had enough time to fail yet
 ↓
-Causal methods that control for these confounders: "The change REDUCED failure rates by Y% (95% CI: [a, b])"
+Causal methods that control for these confounders: "The change REDUCED failure probability by 4.97 percentage points (95% CI: [-7.52, -2.27])"
 ↓
-Survival analysis framing for reliability teams: "B10-life increased from M1 to M2 months (Cox HR = 0.YZ)"
+Survival analysis framing for reliability teams: "Cox-adjusted B10 life increased from 6 to 8 months (Cox HR = 0.812)"
 ```
 
 *This is what 7 years of observational field-failure judgment at Daikin and Rheem looks like applied to statistics.*
@@ -50,17 +50,15 @@ Survival analysis framing for reliability teams: "B10-life increased from M1 to 
 
 ## Key Results
 
-*Filled in after notebooks run.*
-
 | Method | Effect Estimate | 95% CI | Notes |
 |--------|----------------|--------|-------|
-| Naive before/after | — | — | Confounded — incorrect direction |
-| Propensity Score Matching | — | — | ATT, matched on region + install date |
-| Difference-in-Differences | — | — | Unit + time fixed effects |
-| Synthetic Control | — | — | Southeast rollout case study |
-| Cox PH (hazard ratio) | — | — | Confounder-adjusted |
-| **B10-life: old design** | — months | — | 10% cumulative failure |
-| **B10-life: new design** | — months | — | 10% cumulative failure |
+| Naive comparison | +7.11% relative failure increase | — | Confounded — incorrect direction |
+| Propensity Score Matching | -4.97 pp | [-7.52, -2.27] pp | Main causal failure-rate estimate |
+| Difference-in-Differences | -3.70 pp | [-9.48, 2.08] pp | Directionally consistent, underpowered |
+| Synthetic Control | +10.50 pp gap | — | Rejected: poor pre-treatment fit |
+| Cox PH (hazard ratio) | 0.812 | [0.718, 0.918] | Main reliability estimate |
+| **Cox-adjusted B10-life: old design** | 6 months | — | 10% cumulative failure under reference covariates |
+| **Cox-adjusted B10-life: new design** | 8 months | — | +2 month warranty-window improvement |
 
 ---
 
@@ -80,6 +78,8 @@ Survival analysis framing for reliability teams: "B10-life increased from M1 to 
 | `failure_event` | 1 = failure observed, 0 = right-censored |
 | `time_to_event` | Months from install to failure or end-of-window |
 | **True causal effect** | Variant B reduces failure hazard by **15%** (the ground truth to recover) |
+
+The synthetic rollout is intentionally non-random: variant B enters the Southeast first, and the Southeast has higher baseline hazard. That makes the naive result point in the wrong direction, which is the stakeholder problem this project is built to solve.
 
 **Why synthetic-with-known-truth is the right choice here:**
 > *"A real dataset never tells you what the truth was. A synthetic panel with known ground truth lets me run each method and show exactly how close it gets — and where each one breaks under confounding. That's a methodology showcase a real dataset can't give you."*
@@ -113,8 +113,18 @@ python -m ipykernel install --user --name causal-field --display-name "causal-fi
 # Generate the synthetic panel (runs in seconds — no downloads)
 python src/data_generator.py
 
-# Run notebooks in order: 01 → 02 → 03 → 04 → 05 → 07 → 08
-# Then: quarto render report/causal_field_analytics.qmd
+# Reproduce portfolio metrics and figures
+python scripts/portfolio_analysis.py
+
+# Render the report
+quarto render report/causal_field_analytics.qmd
+```
+
+If `python` is not on your shell path, use:
+
+```bash
+conda run -n causal-field python scripts/portfolio_analysis.py
+quarto render report/causal_field_analytics.qmd
 ```
 
 ---

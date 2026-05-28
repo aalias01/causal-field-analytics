@@ -6,6 +6,7 @@ __pycache__/
 .env
 .venv/
 .ipynb_checkpoints/
+.matplotlib/
 # Allow rendered HTML but not Quarto intermediate files
 report/_files/
 report/.quarto/

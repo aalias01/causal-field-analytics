@@ -18,208 +18,156 @@ execute:
   message: false
 ---
 
-```{python}
-#| include: false
-import sys; sys.path.insert(0, '..')
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from pathlib import Path
-
-# Generate data if not present
-if not Path('../data/field_panel.csv').exists():
-    from src.data_generator import main as gen
-    import os; orig = os.getcwd(); os.chdir('..'); gen(); os.chdir(orig)
-
-df = pd.read_csv('../data/field_panel.csv', parse_dates=['install_date'])
-df['install_month_num'] = df.install_date.dt.month + (df.install_date.dt.year - 2022) * 12
-TRUE_HR = 0.85
-```
-
 ## Executive Summary
 
-Engineering organizations constantly make design changes — a supplier swap, a firmware update, a refrigerant-driven redesign — and then ask *"did this actually improve field reliability?"*
+Engineering organizations constantly make design changes -- a supplier swap, a firmware update, a refrigerant-driven redesign -- and then ask: *did this actually improve field reliability?*
 
-The naive answer — compare failure rates before vs. after — is **wrong**. This report shows why, and demonstrates four causal methods that get it right.
+The naive answer says **no**. In this simulated field panel, a simple observed failure-rate comparison says variant B increased failures by **2.27 percentage points** (**+7.11% relative**). That is the wrong conclusion: variant B has a known ground-truth hazard ratio of **0.85**, meaning a **15% lower failure hazard**.
 
-**The headline finding:** The naive comparison estimates the design change *increased* failure rates by approximately **+X%**. Applying causal methods that control for seasonality, selection bias, and regional confounding, the true effect is a **Y% reduction** (95% CI: [a, b]). The Cox proportional hazards model yields a hazard ratio of **0.YZ** — consistent with the known ground-truth effect of 0.85.
+After controlling for rollout bias, region, install crew, install month, and operating hours:
 
-**For reliability engineers:** Under the old design, 10% of units had failed by month **M1** (B10 life). Under the new design, this extends to month **M2** — a direct reduction in warranty exposure.
+- Propensity score matching estimates a **-4.97 percentage-point** failure-rate reduction (95% CI: **[-7.52, -2.27]**).
+- Cox proportional hazards estimates **HR = 0.812** (95% CI: **[0.718, 0.918]**, p = **0.0009**).
+- Cox-adjusted B10 life improves from **6.0 months** under the old design to **8.0 months** under the new design.
+
+The honest diagnostic story matters too: DiD points in the protective direction but is imprecise, while synthetic control has poor pre-treatment fit and should not be trusted for the headline estimate. That is exactly the point of the project: causal methods are not interchangeable buttons; they are assumptions that must be checked.
 
 ::: {.callout-note}
-**On the data:** This analysis uses a synthetic field panel generated with domain knowledge from 12+ years of HVAC and manufacturing reliability engineering. The panel has a *known* true causal effect (HR = 0.85), which allows each method's performance to be evaluated directly. Real industrial datasets rarely disclose true effects — using known ground truth is the right choice for a methodology showcase.
+**On the data:** This analysis uses a synthetic field panel with known ground truth. That is intentional. A real observational dataset almost never reveals the true treatment effect, while a known-truth simulation lets each method be evaluated directly.
 :::
 
----
+## Dataset
 
-## Background: Why Naive Analysis Lies
+The panel contains **5,000 equipment units** observed for up to 24 months:
 
-```{python}
-#| fig-cap: "Three confounders that bias naive failure-rate comparisons"
-# [Populated from notebook 02 — paste figure here]
-# plt.imread('../figures/naive_confounders.png')
-```
+- Variant A control units: **2,887**
+- Variant B treated units: **2,113**
+- Ground truth: variant B reduces failure hazard by **15%** (**HR = 0.85**)
+- Confounders: region, install crew, install month, operating hours, seasonality, right-censoring, and non-random rollout
 
-### The Three Confounders
+The data-generating process intentionally makes variant B more likely in the Southeast, the hottest and highest-hazard region. This creates the portfolio hook: the new design is genuinely better, but its rollout pattern makes the naive comparison look worse.
 
-**1. Selection bias — install date predicts treatment**
+![Treatment assignment and observed failure rates over time](../figures/naive_confounders.png)
 
-Newer units were more likely to receive variant B. But newer units *also* have lower baseline failure rates (they haven't been running long enough to fail yet). A naive comparison conflates the design effect with the install-age effect.
+## Why Naive Analysis Lies
 
-**2. Seasonality**
+The observed failure rates are:
 
-HVAC equipment fails more in summer months regardless of design. A rollout that started in winter will look better than one that started in summer — not because of the design, but because of the season.
+| Design | Observed Failure Rate |
+|---|---:|
+| Variant A | 31.90% |
+| Variant B | 34.17% |
 
-**3. Regional confounding**
+Naively, variant B appears to increase failures by **2.27 percentage points**. That estimate mixes the design effect with three sources of bias:
 
-The Southeast received the new design first. The Southeast also has higher ambient temperatures and therefore higher baseline failure rates. A naive comparison can make the new design look *worse* if the Southeast's baseline hazard dominates.
-
-**Result:** Naive estimate: **+X%** (wrong direction). Causal estimate: **−Y%** (correct).
-
----
+- **Regional confounding:** variant B enters the Southeast first, and Southeast equipment has higher baseline hazard.
+- **Calendar-time confounding:** newer installs are more likely to receive variant B, while seasonality shifts failure risk over the observation window.
+- **Right-censoring:** units installed later have less time at risk.
 
 ## Causal DAG
 
-The causal graph makes the confounding structure explicit:
+```text
+install_date  -> design_variant -> failure_event
+     |                                ^
+     +--------------------------------+
 
-```
-install_date ──→ design_variant ──→ failure_event
-     │                                    ↑
-     └──────────────────────────────────→ │
-region ────→ design_variant               │
-  └──────────────────────────────────────→ │
-install_crew ───────────────────────────→ │
-```
+region        -> design_variant       |
+     +--------------------------------+
 
-`install_date`, `region`, and `install_crew` are **common causes** — they affect both which design variant a unit receives AND its failure rate. They must be controlled.
-
----
-
-## Method 1 — Propensity Score Matching
-
-```{python}
-#| fig-cap: "Covariate balance before and after propensity score matching"
-# [Populated from notebook 03]
-# figures/propensity_overlap.png
+install_crew  ----------------------> failure_event
+operating_hours --------------------> failure_event
+seasonality   ----------------------> failure_event
 ```
 
-**Identifying assumption:** No unmeasured confounders (unconfoundedness).
+`install_date`, `region`, `install_crew`, and usage intensity must be controlled before the design effect is interpreted.
 
-After matching treated units to similar-propensity control units:
+## Propensity Score Matching
 
-- **ATT: [from notebook 03]%** (95% CI: [a, b])
-- Covariate balance SMD < 0.10 for all confounders post-matching ✓
+**Identifying assumption:** no unmeasured confounders after controlling for observed rollout drivers.
 
-**Sensitivity analysis:** The Rosenbaum bounds / E-value indicate that an unobserved confounder would need to [description] to overturn this result.
+The propensity model predicts treatment assignment from region, install crew, install month, and operating hours, then matches each treated unit to the nearest control unit in propensity-score space.
 
----
+![Matched propensity score overlap](../figures/propensity_overlap.png)
 
-## Method 2 — Difference-in-Differences
+| Metric | Value |
+|---|---:|
+| Matched treated-control pairs | 2,113 |
+| Failure-rate effect | -4.97 pp |
+| 95% bootstrap CI | [-7.52, -2.27] pp |
 
-```{python}
-#| fig-cap: "Parallel trends diagnostic"
-# [Populated from notebook 04]
-# figures/parallel_trends.png
-```
+The matched estimate says variant B reduces observed failure probability once treatment assignment bias is controlled.
 
-**Identifying assumption:** Parallel pre-treatment trends between Southeast and other regions.
+## Difference-in-Differences
 
-Pre-treatment trend test: [pass/fail — from notebook 04 parallel trends plot]
+**Identifying assumption:** the Southeast rollout group and other regions would have followed parallel failure-rate trends without treatment.
 
-- **DiD ATT: [from notebook 04] percentage points** (95% CI: [a, b])
-- Placebo test (fake early treatment): coefficient near zero ✓
+![Parallel trends diagnostic](../figures/parallel_trends.png)
 
----
+The estimated rollout effect is **-3.70 percentage points** (95% CI: **[-9.48, 2.08]**, p = **0.2101**).
 
-## Method 3 — Synthetic Control
+This points in the same protective direction as PSM and Cox PH, but the confidence interval crosses zero. For a portfolio project, that is a feature rather than a bug: the report shows the diagnostic and does not overclaim.
 
-```{python}
-#| fig-cap: "Southeast vs. synthetic counterfactual"
-# [Populated from notebook 05]
-# figures/synthetic_control.png
-```
+## Synthetic Control
 
-**Identifying assumption:** Pre-treatment trajectory fit quality.
+**Identifying assumption:** a weighted combination of control regions can reproduce the Southeast's pre-treatment trend.
 
-**"What would the Southeast's failure rate have been if we'd never made the change?"**
+![Southeast vs synthetic counterfactual](../figures/synthetic_control.png)
 
-- Synthetic control weights: Southwest [w1], Midwest [w2], Northwest [w3]
-- Pre-treatment RMSPE: [from notebook 05]
-- Post-treatment gap: **[from notebook 05]%** average reduction
+The optimizer puts all weight on the Southwest, with a pre-treatment RMSPE of **13.66 percentage points**. That is poor pre-treatment fit, so this method is not used for the headline conclusion.
 
----
+Synthetic control is still valuable here because it teaches the right behavior: when the counterfactual is weak, do not dress it up as evidence.
 
-## Method 4 — Survival Analysis
+## Survival Analysis
 
-```{python}
-#| fig-cap: "Kaplan-Meier survival curves — variant B vs. A"
-# [Populated from notebook 07]
-# figures/kaplan_meier.png
-```
+Field-failure data is naturally survival data:
 
-**Why this matters for reliability teams:** A field-failure panel is literally a survival dataset. Install date = enrollment. Failure = event. Units that haven't failed yet = right-censored. Reliability engineering's vocabulary (MTBF, B10 life, hazard rate) is biostatistics survival analysis with industrial terminology.
+- install date = enrollment
+- failure event = event
+- units still running = right-censored observations
 
-### Kaplan-Meier Results
+![Kaplan-Meier survival curves](../figures/kaplan_meier.png)
 
-- Log-rank test: p = [from notebook 07] — [significant/not significant] difference in survival distributions
-- Visual: variant B survival curve is [above/below] variant A throughout
+The unadjusted Kaplan-Meier curves are visibly confounded by the Southeast-heavy rollout. The adjusted Cox model is the right reliability headline.
 
-### Cox Proportional Hazards (Confounder-Adjusted)
+| Survival Metric | Value |
+|---|---:|
+| Cox hazard ratio for variant B | 0.812 |
+| 95% CI | [0.718, 0.918] |
+| p-value | 0.0009 |
+| True hazard ratio | 0.850 |
+| Treatment PH diagnostic p-value | 0.1961 |
+| Cox-adjusted B10, Variant A | 6.0 months |
+| Cox-adjusted B10, Variant B | 8.0 months |
+| B10 improvement | +2.0 months |
 
-**Hazard Ratio: [from notebook 07]** (95% CI: [a, b], p = [p-value])
-
-*"Variant B reduces the instantaneous failure risk by approximately [1-HR]*100% at any point in time, after controlling for region, install crew, and install date."*
-
-Proportional hazards assumption: Schoenfeld residual test p = [from notebook 07] — [pass/flag]
-
-### B10-Life Comparison
-
-| Design Variant | B10 Life (months) | Interpretation |
-|---------------|-------------------|----------------|
-| A (old design) | [from NB07] | 10% of units have failed by this month |
-| **B (new design)** | **[from NB07]** | **+[delta] months improvement in warranty window** |
-
-*"A finance team can directly translate the B10-life delta into expected warranty claims reduction over the product's first N months in field."*
-
----
+Interpretation: after controlling for region, install crew, install month, and operating hours, variant B reduces instantaneous failure risk by about **18.8%**. The estimate is close to the known true effect of **15%**, and the proportional-hazards diagnostic does not flag the treatment term.
 
 ## Method Comparison
 
-```{python}
-#| fig-cap: "Effect estimates across all methods — convergence validates the causal claim"
-# [Populated from notebook 08]
-# figures/method_comparison_forest.png
-```
+![Method comparison forest plot](../figures/method_comparison_forest.png)
 
-| Method | Effect Estimate | 95% CI | Identifying Assumption |
-|--------|----------------|--------|----------------------|
-| Naive (straw man) | +X% | — | None — confounded |
-| Propensity Matching | [Y]% | [a, b] | No unmeasured confounders |
-| Difference-in-Differences | [Y] pp | [a, b] | Parallel trends |
-| Synthetic Control | [Y]% | — | Pre-trend fit |
-| **Cox PH (HR)** | **[HR]** | **[a, b]** | **Proportional hazards** |
-| True effect | −15% / HR = 0.85 | — | Known ground truth |
-
-*The causal estimates converge. The naive estimate has the wrong sign.*
-
----
+| Method | Estimate | 95% CI | Portfolio Interpretation |
+|---|---:|---:|---|
+| Naive comparison | +7.11% relative failure increase | -- | Wrong direction due to confounding |
+| Propensity score matching | -4.97 pp | [-7.52, -2.27] pp | Main causal failure-rate estimate |
+| Difference-in-differences | -3.70 pp | [-9.48, 2.08] pp | Directionally consistent, underpowered |
+| Synthetic control | +10.50 pp gap | -- | Rejected due to poor pre-fit |
+| Cox PH | HR = 0.812 | [0.718, 0.918] | Main reliability estimate |
+| Ground truth | HR = 0.850 | -- | Known simulation target |
 
 ## Limitations
 
-1. **Synthetic data disclosure:** The panel is simulated with known ground truth. This is appropriate for a methodology showcase but should not be cited as evidence about any real product.
-2. **Unobserved confounders:** The Rosenbaum bounds analysis quantifies how much hidden confounding would be needed to invalidate the PSM result.
-3. **Proportional hazards assumption:** If Schoenfeld test flags a violation, the Cox PH HR should be supplemented with a stratified model or AFT alternative.
-4. **External validity:** Causal estimates from one product/region may not generalize to other equipment lines or markets.
+1. **Synthetic data:** the results demonstrate methodology, not a real product claim.
+2. **Unobserved confounding:** PSM and Cox adjust only for measured features.
+3. **Synthetic-control fit:** this design does not produce a credible synthetic counterfactual; the diagnostic is intentionally reported.
+4. **Time horizon:** B10 is estimated inside a 24-month observation window and should not be extrapolated without stronger parametric validation.
+
+## Conclusion
+
+The naive field-failure comparison gives the wrong business answer: it says the design change made failures worse. After causal adjustment, variant B shows a clear protective effect. The Cox model estimates **HR = 0.812**, close to the true **0.85**, and the adjusted B10 life improves by **2 months**.
+
+For reliability and warranty teams, this is the actionable translation: do not compare raw failure rates after a non-random rollout. Model assignment, censoring, and field conditions first, then turn the causal estimate into reliability language the business can use.
 
 ---
 
-## Conclusions
-
-The naive before/after comparison gave the wrong answer — and the wrong direction. Four causal methods converge on a consistent finding: the design change reduced field-failure rates by approximately **Y%** (equivalent to a hazard ratio of **0.YZ**). The B10-life improved from **M1** to **M2** months, which translates directly to a reduction in warranty exposure.
-
-For reliability and warranty teams: this methodology is applicable to any design-change evaluation where treatment assignment is non-random — which is the *default* in real engineering organizations, not the exception.
-
----
-
-*Analysis by Alvin Alias — MS Data Science, University of Washington · 12 years industrial engineering (HVAC, manufacturing, subsea)*
+*Analysis by Alvin Alias -- MS Data Science, University of Washington; industrial field-failure analytics background across HVAC, manufacturing, and reliability workflows.*

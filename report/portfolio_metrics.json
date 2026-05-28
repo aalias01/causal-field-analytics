@@ -1,0 +1,54 @@
+{
+  "dataset": {
+    "n_units": 5000,
+    "n_variant_a": 2887,
+    "n_variant_b": 2113,
+    "true_hazard_ratio": 0.85,
+    "true_hazard_reduction_pct": 15.0
+  },
+  "naive": {
+    "method": "Naive",
+    "failure_rate_a": 31.9,
+    "failure_rate_b": 34.17,
+    "diff_pp": 2.27,
+    "relative_pct": 7.11
+  },
+  "psm": {
+    "method": "Propensity score matching",
+    "effect_pp": -4.97,
+    "ci_lower_pp": -7.52,
+    "ci_upper_pp": -2.27,
+    "n_matched_pairs": 2113
+  },
+  "did": {
+    "method": "Difference-in-differences",
+    "effect_pp": -3.7,
+    "ci_lower_pp": -9.48,
+    "ci_upper_pp": 2.08,
+    "p_value": 0.2101,
+    "note": "Southeast rollout approximation with region and install-quarter fixed effects."
+  },
+  "synthetic_control": {
+    "method": "Synthetic control",
+    "post_gap_pp": 10.5,
+    "pre_rmspe_pp": 13.66,
+    "weights": {
+      "Southwest": 1.0,
+      "Midwest": 0.0,
+      "Northwest": 0.0
+    }
+  },
+  "survival": {
+    "method": "Cox proportional hazards",
+    "hazard_ratio": 0.812,
+    "ci_lower": 0.718,
+    "ci_upper": 0.918,
+    "p_value": 0.0009,
+    "b10_a_months": 6.0,
+    "b10_b_months": 8.0,
+    "b10_delta_months": 2.0,
+    "logrank_p_value": 0.0001,
+    "cox_treatment_ph_p_value": 0.1961,
+    "weibull_time_ratio": 0.838
+  }
+}
