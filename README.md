@@ -9,8 +9,10 @@
 
 Engineering organizations constantly make design changes — a supplier swap, a firmware update, a refrigerant-driven redesign — and then ask *"did this actually improve field reliability?"* The naive answer (compare failure rates before vs. after) is wrong. This project shows why, and builds the right toolkit.
 
-**Live report:** local Quarto HTML ready to deploy *(see `report/causal_field_analytics.html` after render)*  
+**Live report:** [aalias01.github.io/causal-field-analytics](https://aalias01.github.io/causal-field-analytics/report/causal_field_analytics.html)  
 **GitHub:** [aalias01/causal-field-analytics](https://github.com/aalias01/causal-field-analytics)
+
+![Method comparison forest plot — naive and synthetic-control estimates miss; PSM and Cox PH recover the true effect](figures/method_comparison_forest.png)
 
 ---
 
