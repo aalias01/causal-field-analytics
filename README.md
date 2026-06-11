@@ -98,7 +98,7 @@ The synthetic rollout is intentionally non-random: variant B enters the Southeas
 | Synthetic control | pysyncon |
 | Survival analysis | lifelines (KM, Cox PH, Weibull AFT) |
 | Modern causal estimators | EconML (DML, DR-Learner) |
-| Report | Quarto → static HTML → Vercel |
+| Report | Quarto → static HTML → GitHub Pages |
 
 ---
 
