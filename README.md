@@ -1,6 +1,6 @@
 # Causal Field Analytics
 
-> **Estimating the impact of engineering design changes on field-failure rates from observational data — with survival analysis for reliability-engineering stakeholders.**
+> **Estimating the causal impact of engineering design changes on field-failure rates from observational data, with survival analysis output framed for reliability-engineering stakeholders: hazard ratios and B10-life estimates, not p-values.**
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
 [![DoWhy](https://img.shields.io/badge/DoWhy-0.11-purple)](https://www.pywhy.org/dowhy/)
@@ -131,18 +131,4 @@ quarto render report/causal_field_analytics.qmd
 
 ---
 
-## Interview Context
-
-1. **The naive problem:** *"At Daikin, I saw teams declare victory on a design change that was really just a seasonal dip. And I've seen good changes get blamed for problems they didn't cause. This is the toolkit I wish we'd had — and what I'd build first on day one with a reliability team."*
-
-2. **Why four causal methods?** *"Each has a different identifying assumption. The right answer is to show estimates converge — or honestly report where they don't and why. Stakeholders trust that honesty more than a single flashy number."*
-
-3. **Cross-lane:** *"Propensity matching on customer features, DiD on region rollouts, CUPED for variance reduction — that's the Costco/Amazon experimentation stack. Cox PH with B10-life output — that's the Boeing/GE Vernova reliability stack. Same methodology, two dialects."*
-
-4. **Survival analysis bridge:** *"Reliability engineering's vocabulary — MTBF, hazard rate, B10 life — is just biostatistics survival analysis. A field-failure panel is literally a survival dataset: install date = enrollment, failure = event, units that haven't failed = right-censored. I can talk to a reliability engineer or a biostatistician with the same toolkit. That cross is rare at the entry-DS level."*
-
-5. **The ground-truth move:** *"True causal effect: variant B reduces hazard by 15%. I run each method and show how close it gets. That's a teaching-through-demonstration move a real dataset can't give you."*
-
----
-
-*Built by [Alvin Alias](https://github.com/aalias01) — MS Data Science, University of Washington · 7 years Daikin/Rheem field-failure analytics · DATA 557 Applied Statistics & Experimental Design*
+*Built by [Alvin Alias](https://github.com/aalias01) · MS Data Science, University of Washington · 7 years Daikin/Rheem field-failure analytics*
