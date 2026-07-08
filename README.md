@@ -1,108 +1,75 @@
 # Causal Field Analytics
 
-> **Estimating the causal impact of engineering design changes on field-failure rates from observational data, with survival analysis output framed for reliability-engineering stakeholders: hazard ratios and B10-life estimates, not p-values.**
+Estimates the causal effect of an engineering design change on field-failure rates from observational data, then reports it the way reliability teams consume it: hazard ratios and B10 life, not p-values. Five methods run against a synthetic panel with known ground truth, so each method's error is measurable, not arguable.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
 [![DoWhy](https://img.shields.io/badge/DoWhy-0.11-purple)](https://www.pywhy.org/dowhy/)
 [![lifelines](https://img.shields.io/badge/lifelines-0.28-teal)](https://lifelines.readthedocs.io/)
 [![Quarto](https://img.shields.io/badge/Quarto-report-orange)](https://quarto.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
 
-Engineering organizations constantly make design changes — a supplier swap, a firmware update, a refrigerant-driven redesign — and then ask *"did this actually improve field reliability?"* The naive answer (compare failure rates before vs. after) is wrong. This project shows why, and builds the right toolkit.
+**[Live report](https://aalias01.github.io/causal-field-analytics/report/causal_field_analytics.html)**
 
-**Live report:** [aalias01.github.io/causal-field-analytics](https://aalias01.github.io/causal-field-analytics/report/causal_field_analytics.html)  
-**GitHub:** [aalias01/causal-field-analytics](https://github.com/aalias01/causal-field-analytics)
+![Method comparison forest plot: naive and synthetic-control estimates miss; PSM and Cox PH recover the true effect](figures/method_comparison_forest.png)
 
-![Method comparison forest plot — naive and synthetic-control estimates miss; PSM and Cox PH recover the true effect](figures/method_comparison_forest.png)
+## The problem
 
----
-
-## The Central Argument
+Engineering organizations make design changes (a supplier swap, a firmware update, a refrigerant-driven redesign) and then ask whether the change improved field reliability. The naive answer, comparing failure rates before vs after, is wrong here by construction:
 
 ```
-Naive before/after comparison: "The design change made failure rates WORSE (+7.11%)"
-↓
-What the naive view is missing:
-  • Seasonality: HVAC fails more in July regardless of design
-  • Selection bias: newer units got the redesign AND have lower baseline failure rates
-  • Regional confounding: Southeast rollout first — climate differs
-  • Reporting lag: recently-installed units haven't had enough time to fail yet
-↓
-Causal methods that control for these confounders: "The change REDUCED failure probability by 4.97 percentage points (95% CI: [-7.52, -2.27])"
-↓
-Survival analysis framing for reliability teams: "Cox-adjusted B10 life increased from 6 to 8 months (Cox HR = 0.812)"
+Naive before/after: "the design change made failure rates WORSE (+7.11%)"
+
+What the naive view misses:
+  seasonality        HVAC fails more in July regardless of design
+  selection bias     newer units got the redesign AND have lower baseline failure rates
+  regional rollout   Southeast first, and its climate differs
+  reporting lag      recently installed units haven't had time to fail yet
+
+Causal methods controlling for these: "the change REDUCED failure probability
+by 4.97 percentage points (95% CI: [-7.52, -2.27])"
+
+Survival framing for reliability teams: "Cox-adjusted B10 life moved from
+6 to 8 months (Cox HR = 0.812)"
 ```
 
-*This is what 7 years of observational field-failure judgment at Daikin and Rheem looks like applied to statistics.*
+I spent 7 years doing observational field-failure analysis at Daikin and Rheem; this project is that judgment written down as statistics.
 
----
+## Results
 
-## Methods Compared
+The generator plants a true effect: variant B reduces failure hazard by 15%. Each method either recovers it or fails in a diagnosable way.
 
-| Method | Identifying Assumption | What It Answers |
-|--------|----------------------|-----------------|
-| Naive before/after *(straw man)* | None — intentionally wrong | Baseline for how bad naive analysis is |
-| Propensity Score Matching | No unmeasured confounders | Average Treatment Effect on the Treated (ATT) |
-| Difference-in-Differences | Parallel pre-treatment trends | Causal effect of timed rollout |
-| Synthetic Control | Pre-treatment trajectory fit | Counterfactual for single-region rollout |
-| **Cox Proportional Hazards** | Proportional hazards (testable) | **Hazard ratio + B10-life for reliability teams** |
+| Method | Effect estimate | 95% CI | Verdict |
+|--------|----------------|--------|---------|
+| Naive before/after | +7.11% relative failure increase | n/a | Confounded; wrong direction (the straw man) |
+| Propensity Score Matching | -4.97 pp | [-7.52, -2.27] | Main causal failure-rate estimate |
+| Difference-in-Differences | -3.70 pp | [-9.48, 2.08] | Directionally consistent, underpowered |
+| Synthetic Control | +10.50 pp gap | n/a | Rejected: poor pre-treatment fit |
+| Cox PH hazard ratio | 0.812 | [0.718, 0.918] | Main reliability estimate |
+| Cox-adjusted B10 life, old design | 6 months | n/a | 10% cumulative failure, reference covariates |
+| Cox-adjusted B10 life, new design | 8 months | n/a | A 2-month warranty-window improvement |
 
-*The value is showing estimates converge — or honestly reporting where they don't, and why.*
+The point of running five methods is seeing where estimates converge and reporting where they don't. Synthetic control fails here and the report says why (single-region rollout with poor donor fit) instead of hiding it.
 
----
+| Method | Identifying assumption |
+|--------|------------------------|
+| PSM | No unmeasured confounders |
+| DiD | Parallel pre-treatment trends |
+| Synthetic control | Pre-treatment trajectory fit |
+| Cox PH | Proportional hazards (testable, tested) |
 
-## Key Results
+## The data
 
-| Method | Effect Estimate | 95% CI | Notes |
-|--------|----------------|--------|-------|
-| Naive comparison | +7.11% relative failure increase | — | Confounded — incorrect direction |
-| Propensity Score Matching | -4.97 pp | [-7.52, -2.27] pp | Main causal failure-rate estimate |
-| Difference-in-Differences | -3.70 pp | [-9.48, 2.08] pp | Directionally consistent, underpowered |
-| Synthetic Control | +10.50 pp gap | — | Rejected: poor pre-treatment fit |
-| Cox PH (hazard ratio) | 0.812 | [0.718, 0.918] | Main reliability estimate |
-| **Cox-adjusted B10-life: old design** | 6 months | — | 10% cumulative failure under reference covariates |
-| **Cox-adjusted B10-life: new design** | 8 months | — | +2 month warranty-window improvement |
+A synthetic field panel from `src/data_generator.py`: ~5,000 units, 24-month observation window, right-censoring, with region (4), install crew (3), design variant (treatment), and time-to-event fields.
 
----
+The rollout is intentionally non-random: variant B enters the Southeast first, and the Southeast has a higher baseline hazard. That's what makes the naive estimate point the wrong way, which is the exact stakeholder problem this project exists to demonstrate.
 
-## Dataset
+Why synthetic with known truth: a real dataset never tells you what the right answer was. A planted 15% hazard reduction lets me measure how close each method gets and show exactly how each one breaks under confounding. A real dataset can't do that.
 
-**Synthetic field panel with known ground truth** — generated by `src/data_generator.py`.
+## Tech stack
 
-~5,000 equipment units, 24-month observation window.
+Python 3.11, DoWhy 0.11 (identification, estimation, refutation), causalinference (PSM), statsmodels (DiD with fixed effects), pysyncon (synthetic control), lifelines 0.28 (Kaplan-Meier, Cox PH, Weibull AFT), EconML (DML, DR-Learner), Quarto report published to GitHub Pages.
 
-| Feature | Description |
-|---------|-------------|
-| `unit_id` | Unique equipment identifier |
-| `install_date` | Enrollment date (survival start) |
-| `region` | 4 geographic regions (confounds treatment assignment) |
-| `install_crew` | 3 crew types (confounds failure rate) |
-| `design_variant` | Treatment (B = new design) vs. control (A = old) |
-| `failure_event` | 1 = failure observed, 0 = right-censored |
-| `time_to_event` | Months from install to failure or end-of-window |
-| **True causal effect** | Variant B reduces failure hazard by **15%** (the ground truth to recover) |
-
-The synthetic rollout is intentionally non-random: variant B enters the Southeast first, and the Southeast has higher baseline hazard. That makes the naive result point in the wrong direction, which is the stakeholder problem this project is built to solve.
-
-**Why synthetic-with-known-truth is the right choice here:**
-> *"A real dataset never tells you what the truth was. A synthetic panel with known ground truth lets me run each method and show exactly how close it gets — and where each one breaks under confounding. That's a methodology showcase a real dataset can't give you."*
-
----
-
-## Tech Stack
-
-| Layer | Tool |
-|-------|------|
-| Causal framework | DoWhy — identification → estimation → refutation |
-| Propensity matching | causalinference |
-| DiD | statsmodels OLS with fixed effects |
-| Synthetic control | pysyncon |
-| Survival analysis | lifelines (KM, Cox PH, Weibull AFT) |
-| Modern causal estimators | EconML (DML, DR-Learner) |
-| Report | Quarto → static HTML → GitHub Pages |
-
----
-
-## Setup
+## Run it locally
 
 ```bash
 git clone https://github.com/aalias01/causal-field-analytics
@@ -110,25 +77,19 @@ cd causal-field-analytics
 
 conda env create -f environment.yml
 conda activate causal-field
-python -m ipykernel install --user --name causal-field --display-name "causal-field"
+python -m ipykernel install --user --name causal-field
 
-# Generate the synthetic panel (runs in seconds — no downloads)
-python src/data_generator.py
-
-# Reproduce portfolio metrics and figures
-python scripts/portfolio_analysis.py
-
-# Render the report
+python src/data_generator.py            # generate the panel, runs in seconds
+python scripts/portfolio_analysis.py    # reproduce metrics and figures
 quarto render report/causal_field_analytics.qmd
 ```
 
-If `python` is not on your shell path, use:
+If `python` isn't on your shell path: `conda run -n causal-field python scripts/portfolio_analysis.py`.
 
-```bash
-conda run -n causal-field python scripts/portfolio_analysis.py
-quarto render report/causal_field_analytics.qmd
-```
+## Limitations
 
----
+- All data is synthetic and disclosed as such; the project demonstrates method selection and diagnosis, not a field result.
+- PSM's no-unmeasured-confounders assumption holds here because the generator's confounders are all observed. Real field data offers no such guarantee, which is why the refutation step exists.
+- DiD is underpowered at this panel size; its CI crosses zero.
 
-*Built by [Alvin Alias](https://github.com/aalias01) · MS Data Science, University of Washington · 7 years Daikin/Rheem field-failure analytics*
+Built by [Alvin Alias](https://github.com/aalias01), MS Data Science, University of Washington. 7 years of field-failure analytics at Daikin and Rheem.

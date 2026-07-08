@@ -20,7 +20,7 @@ execute:
 
 ## Executive Summary
 
-Engineering organizations constantly make design changes -- a supplier swap, a firmware update, a refrigerant-driven redesign -- and then ask: *did this actually improve field reliability?*
+Engineering organizations constantly make design changes (a supplier swap, a firmware update, a refrigerant-driven redesign) and then ask: *did this actually improve field reliability?*
 
 The naive answer says **no**. In this simulated field panel, a simple observed failure-rate comparison says variant B increased failures by **2.27 percentage points** (**+7.11% relative**). That is the wrong conclusion: variant B has a known ground-truth hazard ratio of **0.85**, meaning a **15% lower failure hazard**.
 
@@ -148,12 +148,12 @@ Interpretation: after controlling for region, install crew, install month, and o
 
 | Method | Estimate | 95% CI | Portfolio Interpretation |
 |---|---:|---:|---|
-| Naive comparison | +7.11% relative failure increase | -- | Wrong direction due to confounding |
+| Naive comparison | +7.11% relative failure increase | n/a | Wrong direction due to confounding |
 | Propensity score matching | -4.97 pp | [-7.52, -2.27] pp | Main causal failure-rate estimate |
 | Difference-in-differences | -3.70 pp | [-9.48, 2.08] pp | Directionally consistent, underpowered |
-| Synthetic control | +10.50 pp gap | -- | Rejected due to poor pre-fit |
+| Synthetic control | +10.50 pp gap | n/a | Rejected due to poor pre-fit |
 | Cox PH | HR = 0.812 | [0.718, 0.918] | Main reliability estimate |
-| Ground truth | HR = 0.850 | -- | Known simulation target |
+| Ground truth | HR = 0.850 | n/a | Known simulation target |
 
 ## Limitations
 
@@ -170,4 +170,4 @@ For reliability and warranty teams, this is the actionable translation: do not c
 
 ---
 
-*Analysis by Alvin Alias -- MS Data Science, University of Washington; industrial field-failure analytics background across HVAC, manufacturing, and reliability workflows.*
+*Analysis by Alvin Alias, MS Data Science, University of Washington; industrial field-failure analytics background across HVAC, manufacturing, and reliability workflows.*
