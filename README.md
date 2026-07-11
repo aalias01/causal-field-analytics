@@ -1,6 +1,6 @@
 # Causal Field Analytics
 
-Estimates the causal effect of an engineering design change on field-failure rates from observational data, then reports it the way reliability teams consume it: hazard ratios and B10 life, not p-values. Five methods run against a synthetic panel with known ground truth, so each method's error is measurable, not arguable.
+I estimate how an engineering design change affects field-failure rates when deployment was not randomized, then translate the result into hazard ratios and B10 life. Five methods run against a synthetic panel with known ground truth, so I can measure where each method succeeds or breaks.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
 [![DoWhy](https://img.shields.io/badge/DoWhy-0.11-purple)](https://www.pywhy.org/dowhy/)
